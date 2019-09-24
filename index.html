@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Migraciones Isismaweb</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        .code-container {
+            max-width: 100%;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container mt-3">
+        <h1>Migraciones Isismaweb</h1>
+        <p>
+            We are usin node <script>document.write(process.versions.node)</script>,
+            Chrome <script>document.write(process.versions.chrome)</script>, 
+            and Electron <script>document.write(process.versions.electron)</script>.
+        </p>
+        <hr>
+    </div>
+
+    <div class="container">
+        <div class="form-group">
+            <div class="custom-file">
+                <input type="file" id="fileInput" class="custom-file-imput" onchange="prepareFile(event)">
+                <label for="fileInput" class="custom-file-label" id="fileNameSpan">Selecciona un archivo</label>
+            </div>
+        </div>
+        <div class="form-group">
+            <button class="btn btn-primary btn-block" onclick="processAndSendFile()" id="btnSend">Process and Send</button>
+        </div>
+    </div>
+    <div class="container mt-4">
+        <div class="code-container">
+            <pre id="code"></pre>
+        </div>
+    </div>    
+
+    <script>
+
+        let file;
+        let { ipcRenderer } = require('electron');
+
+        ipcRenderer.on('sql-query-to-execute', (ev, sqls) => {
+
+            let codeElement = document.createElement('code');
+            codeElement.className = "lang-sql";
+            codeElement.innerHTML = sqls;
+            code.appendChild(codeElement);
+
+            enableControls();
+            // Prism.highlightAll();
+        });
+
+        function prepareFile(ev) {
+            file = ev.target.files[0];
+            fileNameSpan.innerHTML = file.path;
+        }
+
+        function processAndSendFile() {
+
+            if( file ){
+
+                ipcRenderer.send('process-file', file.path);
+                disableControls();
+
+            }
+            else {
+                alert('You most select an Excel file.');
+            }
+
+        }
+
+        function enableControls() {
+            btnSend.removeAttribute('disabled');
+            fileInput.removeAttribute('disabled');
+        }
+
+        function disableControls() {
+            btnSend.setAttribute('disabled', 'true');
+            fileInput.setAttribute('disabled', 'true');
+        }
+    </script>
+    
+</body>
+</html>

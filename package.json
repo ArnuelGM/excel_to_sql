@@ -1,0 +1,22 @@
+{
+  "name": "electron_importer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^6.0.10"
+  },
+  "dependencies": {
+    "exceljs": "^2.0.1",
+    "knex": "^0.19.4",
+    "lodash": "^4.17.15",
+    "mssql": "^5.1.0",
+    "xlsx": "^0.15.1"
+  }
+}
