@@ -1,8 +1,11 @@
 const XLSX = require('xlsx');
 const _ = require('lodash');
+const moment = require('moment');
 const knex = require('knex')( require('./knex.config').knex );
+const sql = require('mssql');
+const sqlConfig = require('./knex.config').mssql;
 
-async function sqlGenerator(sheet, sheetName, index, wb) {
+/* async function sqlGenerator(sheet, sheetName, index, wb) {
     
     // convertimos la hoja de excel en un objeto json
     let sheetJson = XLSX.utils.sheet_to_json(sheet);
@@ -23,20 +26,77 @@ async function sqlGenerator(sheet, sheetName, index, wb) {
     let sqlToClient = [];
     for (chunk of chunks) {
 
-        let inserted = true;
-        try {
-            await knex.batchInsert(sheetName, chunk, chunk.length);
-        } catch (error) {
-            inserted = false;
-        }
+        let inserted = false;
+        // try {
+        //     await knex.batchInsert(sheetName, chunk, chunk.length);
+        // } catch (error) {
+        //     inserted = false;
+        // }
 
         if (!inserted) { 
-            let sql = knex(sheetName).insert(chunk).toString() + '\r\nGO';
+            let sql = knex(sheetName).update().toString() + '\r\nGO';
             sqlToClient.push(sql);
         }
     }
 
     return sqlToClient;
+} */
+
+async function sqlGenerator(sheet, sheetName, index, wb) {
+    // convertimos la hoja de excel en un objeto json
+    let sheetJson = XLSX.utils.sheet_to_json(sheet);
+
+    // obtenemos los tipos de datos de las columnas de la tabla 
+    // (el nombre de la hoja debe ser igual al nombre de la table donde se insertaran los datos)
+    let cdt = await getColumDataTypes(sheetName);
+    
+    // aplicamos la conversion de tipos de datos segun el tipo de dato de cada columna
+    let sheetJsonTrueDataTypes = parseColumnDataTypes(sheetJson, cdt);
+
+    let pool = await sql.connect(sqlConfig);
+    let conteo = 0;
+    for (let row of sheetJsonTrueDataTypes) {
+        
+        let inserted = await insertOrUpdate(pool, row, 'num_id', row.num_id, sheetName);
+        console.log('inserted or udated: ', inserted);
+
+        conteo++;
+
+        if (conteo == 2) {
+            break;
+        }
+    }
+
+    return [];
+}
+
+async function insertOrUpdate(poolConection, row, primary_key_name, primary_key_value, table_name) {
+    
+    let { recordset } = await poolConection.request().query(`SELECT COUNT(*) AS total_reg FROM ${table_name} WHERE ${primary_key_name} = '${primary_key_value}'`);
+    let total_reg = recordset[0].total_reg;
+    // console.log(total_reg);
+    // return false;
+    
+    let exists = total_reg ? true : false;
+    
+    let sql = '';
+    if (!exists) {
+        sql = knex(table_name).insert(row).toString();
+        console.log(sql);
+    }
+    else {
+        sql = knex(table_name).where(primary_key_name, '=', primary_key_value).update(row).toString();
+        console.log(sql);
+    }
+
+    try {
+        await poolConection.request().query(sql);
+        return true;
+    }
+    catch (error) {
+        console.log(error);
+        return false;
+    }
 }
 
 async function getColumDataTypes(table) {
@@ -53,6 +113,7 @@ async function getColumDataTypes(table) {
             constructor: getDataTypeConstructor((e.DATA_TYPE).toLowerCase())
         };
     });
+    console.log('column data types: ', cdt);
     return cdt;
 }
 
@@ -73,12 +134,13 @@ function getDataTypeConstructor(dataType) {
             return Number;
             break;
         
-        // horas y fechas se guardan como string
         case 'date':
         case 'time':
         case 'datetime':
         case 'datetime2':
         case 'smalldatetime':
+            return function (date) { moment(date).format('YYYY-MM-DD HH:mm:ss.SSS'); }
+            break;
         
         case 'char':
         case 'text':
