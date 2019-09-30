@@ -3,9 +3,9 @@ const { wbEachSheet, readExcel } = require('./readExcel');
 const { sqlGenerator } = require('./sqlGenerator');
 
 const sqlConfig = require('./knex.config');
-// const knex = require('knex')( sqlConfig );
+const knex = require('knex')( sqlConfig.knex );
 const mssql = require('mssql');
-    
+
 let win;
 const createWindow = () => {
     win = new BrowserWindow({
@@ -38,11 +38,23 @@ ipcMain.on('process-file', async (ev, args) => {
     let wb = await readExcel(args);
     
     wbEachSheet(wb, async (sheet, sheetName, index, wb) => {
-        win.webContents.send('sql-query-to-execute', `---[${sheetName}] not inserted---\r\n`);
+        win.webContents.send('sql-query-to-execute', `--[${sheetName}]--\r\n`);
 
+        // Statements es igual a un array en caso de exito
+        // False en caso de error
         let statements = (await sqlGenerator(sheet, sheetName, index, wb));
-        let allOk = statements.length == 0 ? true : false;
+        let allOk = false;
+        let response = null;
 
-        win.webContents.send('sql-query-to-execute', allOk ? 'All OK\r\n\r\n' : (statements.join('\r\n')) + '\r\n\r\n');
+        if (statements) { 
+            allOk = !statements.length;
+            response = allOk ? 'All OK\r\n\r\n' : (statements.join('\r\n')) + '\r\n\r\n';
+        }
+        else {
+            response = 'No fue posible generar el script :(\r\n\r\n';
+        }
+
+        win.webContents.send('sql-query-to-execute', response);
+        
     });
 });

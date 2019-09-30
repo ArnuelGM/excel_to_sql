@@ -32,8 +32,13 @@
                 <label for="fileInput" class="custom-file-label" id="fileNameSpan">Selecciona un archivo</label>
             </div>
         </div>
-        <div class="form-group">
-            <button class="btn btn-primary btn-block" onclick="processAndSendFile()" id="btnSend">Process and Send</button>
+        <div class="form-row">
+            <div class="col">
+                <button class="btn btn-primary btn-block" onclick="processAndSendFile()" id="btnSend">Process and Send</button>
+            </div>
+            <div class="col">
+                <button class="btn btn-danger btn-block" onclick="reset()">Reset</button>
+            </div>
         </div>
     </div>
     <div class="container mt-4">
@@ -75,6 +80,13 @@
                 alert('You most select an Excel file.');
             }
 
+        }
+
+        function reset() {
+            file = null;
+            enableControls();
+            let codeElement = document.createElement('code');
+            codeElement.innerHTML = '';
         }
 
         function enableControls() {

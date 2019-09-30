@@ -5,7 +5,7 @@ const knex = require('knex')( require('./knex.config').knex );
 const sql = require('mssql');
 const sqlConfig = require('./knex.config').mssql;
 
-/* async function sqlGenerator(sheet, sheetName, index, wb) {
+async function sqlGenerator(sheet, sheetName, index, wb) {
     
     // convertimos la hoja de excel en un objeto json
     let sheetJson = XLSX.utils.sheet_to_json(sheet);
@@ -16,33 +16,32 @@ const sqlConfig = require('./knex.config').mssql;
 
     // aplicamos la conversion de tipos de datos segun el tipo de dato de cada columna
     let sheetJsonTrueDataTypes = parseColumnDataTypes(sheetJson, cdt);
+    console.log('rows to insert: ', sheetJsonTrueDataTypes.length);
 
-    // se etsablece un tamaño de insercion por lote
-    let chunkSize = 100;
-
-    // generamos paquetes de insercion (200 registros para inseratr a la vez en este caso)
-    let chunks = _.chunk(sheetJsonTrueDataTypes, chunkSize);
-
-    let sqlToClient = [];
-    for (chunk of chunks) {
-
-        let inserted = false;
-        // try {
-        //     await knex.batchInsert(sheetName, chunk, chunk.length);
-        // } catch (error) {
-        //     inserted = false;
-        // }
-
-        if (!inserted) { 
-            let sql = knex(sheetName).update().toString() + '\r\nGO';
-            sqlToClient.push(sql);
-        }
+    if (sheetJsonTrueDataTypes.length == 0) {
+        console.log('SIN DATOS QUE INSERTAR.');
+        return false;
     }
 
-    return sqlToClient;
-} */
+    // se etsablece un tamaño de insercion por lote
+    let chunkSize = 200;
+    console.log('chunk size: ', chunkSize);
 
-async function sqlGenerator(sheet, sheetName, index, wb) {
+    // generamos paquetes de insercion de tamaño [chunkSize]
+    let chunks = _.chunk(sheetJsonTrueDataTypes, chunkSize);
+    console.log('chunks count: ', chunks.length);
+
+    let slqChunks = [];
+    for (chunk of chunks) {
+        let sql = knex(sheetName).insert(chunk).toString() + '\r\nGO';
+        slqChunks.push(sql);
+    }
+    console.log('chunks generated: ', slqChunks.length);
+
+    return slqChunks;
+}
+
+/* async function sqlGenerator(sheet, sheetName, index, wb) {
     // convertimos la hoja de excel en un objeto json
     let sheetJson = XLSX.utils.sheet_to_json(sheet);
 
@@ -55,22 +54,24 @@ async function sqlGenerator(sheet, sheetName, index, wb) {
 
     let pool = await sql.connect(sqlConfig);
     let conteo = 0;
+    let notInserted = [];
     for (let row of sheetJsonTrueDataTypes) {
         
-        let inserted = await insertOrUpdate(pool, row, 'num_id', row.num_id, sheetName);
-        console.log('inserted or udated: ', inserted);
+        await insertOrUpdate(pool, row, 'num_id', row.num_id, sheetName, notInserted);
+        // console.log('inserted or udated: ', );
 
         conteo++;
 
-        if (conteo == 2) {
-            break;
+        if (conteo % 100 == 0) {
+            console.log(notInserted.length, ' inserted');
+            // break;
         }
     }
 
     return [];
-}
+} */
 
-async function insertOrUpdate(poolConection, row, primary_key_name, primary_key_value, table_name) {
+async function insertOrUpdate(poolConection, row, primary_key_name, primary_key_value, table_name, notInserted = []) {
     
     let { recordset } = await poolConection.request().query(`SELECT COUNT(*) AS total_reg FROM ${table_name} WHERE ${primary_key_name} = '${primary_key_value}'`);
     let total_reg = recordset[0].total_reg;
@@ -91,6 +92,7 @@ async function insertOrUpdate(poolConection, row, primary_key_name, primary_key_
 
     try {
         await poolConection.request().query(sql);
+        notInserted.push(row);
         return true;
     }
     catch (error) {
@@ -113,7 +115,7 @@ async function getColumDataTypes(table) {
             constructor: getDataTypeConstructor((e.DATA_TYPE).toLowerCase())
         };
     });
-    console.log('column data types: ', cdt);
+    console.log('column data types: \r\n', cdt);
     return cdt;
 }
 
@@ -139,8 +141,8 @@ function getDataTypeConstructor(dataType) {
         case 'datetime':
         case 'datetime2':
         case 'smalldatetime':
-            return function (date) { moment(date).format('YYYY-MM-DD HH:mm:ss.SSS'); }
-            break;
+            // return function (date) { moment(date).format('YYYY-MM-DD HH:mm:ss.SSS'); }
+            // break;
         
         case 'char':
         case 'text':
@@ -162,8 +164,14 @@ function parseColumnDataTypes(sheetJson, cdt) {
     let sheetJsonTrueDataTypes = _.map(sheetJson, (row) => {
         let rowTrueDataType = {};
         for (key in row) {
-            let prop = key.toLowerCase();
-            rowTrueDataType[prop] = cdt[prop].constructor(row[key]);
+            try {
+                let prop = key.toLowerCase();
+                rowTrueDataType[prop] = cdt[prop].constructor(row[key]);
+            }
+            catch (error) {
+                console.log(`Parece que la columna '${key}' no existe en la tabla destino.\nPor favor verifique e inténtelo nuevamente.`);
+                return [];
+            }
         }
         return rowTrueDataType;
     });
