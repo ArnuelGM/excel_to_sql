@@ -5,7 +5,7 @@ const knex = require('knex')( require('./knex.config').knex );
 const sql = require('mssql');
 const sqlConfig = require('./knex.config').mssql;
 
-async function sqlGenerator(sheet, sheetName, index, wb) {
+async function sqlGenerator(sheet, sheetName) {
     
     // convertimos la hoja de excel en un objeto json
     let sheetJson = XLSX.utils.sheet_to_json(sheet);
@@ -33,7 +33,7 @@ async function sqlGenerator(sheet, sheetName, index, wb) {
 
     let slqChunks = [];
     for (chunk of chunks) {
-        let sql = knex(sheetName).insert(chunk).toString() + '\r\nGO';
+        let sql = knex(sheetName).insert(chunk).toString();
         slqChunks.push(sql);
     }
     console.log('chunks generated: ', slqChunks.length);
@@ -41,7 +41,7 @@ async function sqlGenerator(sheet, sheetName, index, wb) {
     return slqChunks;
 }
 
-/* async function sqlGenerator(sheet, sheetName, index, wb) {
+/* async function sqlGenerator(sheet, sheetName) {
     // convertimos la hoja de excel en un objeto json
     let sheetJson = XLSX.utils.sheet_to_json(sheet);
 
@@ -161,7 +161,7 @@ function getDataTypeConstructor(dataType) {
 }
 
 function parseColumnDataTypes(sheetJson, cdt) {
-    let sheetJsonTrueDataTypes = _.map(sheetJson, (row) => {
+    let sheetJsonTrueDataTypes = sheetJson.map((row) => {
         let rowTrueDataType = {};
         for (key in row) {
             try {
